@@ -1,3 +1,4 @@
+// ACTIVITATE 3
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,12 +13,12 @@ bool exprAssign();
 bool exprComp();
 bool exprLogic();
 bool exprMul();
-bool exprPefix();
+bool exprPrefix();
 bool factor();
 bool funcParam();
 bool funcParams();
 bool instr();
-bool exprPrefix();
+
 
 
 int iTk;	// the iterator in tokens
@@ -44,7 +45,7 @@ bool consume(int code){
 
 
 
-//Laborator activitate sapt 4 ---> 
+//Laborator activitate 3 ---> 
 //baseType :: = TYPE_INT | TYPE_REAL | TYPE_STR --> chestiile de baza, tipurile
 bool baseType() {
 	printf("#baseType %d\n", tokens[iTk].code);
@@ -71,9 +72,9 @@ bool defVar() {
 				}
 			}
 		}
+		iTk = star; //restaurare
 		return false;
 	}
-	iTk = star; //restaurare
 	return false;
 }
 
@@ -84,11 +85,11 @@ bool defFunc() {
 	if (consume(FUNCTION)) {
 		if (consume(ID)) {
 			if(consume(LPAR)) {
-				if(funcParams()){}
+				if(funcParams()){} //optional ?
 				if (consume(RPAR)) {
 					if (consume(COLON)) {
 						if (baseType()) {
-							while (defVar()) {}
+							while (defVar()) {} //repetam de 0 sau mai multe ori
 							if(block()){
 								if (consume(END)) {
 									return true;
@@ -120,13 +121,16 @@ bool block() {
 }	
 
 
-//funcParams :: = funcParam(COMMA funcParam)*
+//funcParams :: = funcParam(COMMA funcParam)* * --> SE REPETA DE LA 0 LA oo
 bool funcParams() {
 	printf("#funcParams %d\n", tokens[iTk].code);
 	int star = iTk;
+
 	if (funcParam()) {
 			while(consume(COMMA)) {
-				if (funcParam()) {}
+				if (!funcParam()) {}
+				iTk = star; //restaurare
+				return false;
 			}
 			return true;
 		}
@@ -144,11 +148,14 @@ bool funcParam() {
 				return true;
 			}
 		}
+		iTk = star; //restaurare
+		return false;
 	}
-	iTk = star; //restaurare
 	return false;
 }
 
+
+// --> DE CORECTAT DE AICI IN JOS
 //instr :: = expr ? SEMICOLON
 //| IF LPAR expr RPAR block(ELSE block) ? END
 //| RETURN expr SEMICOLON
@@ -205,7 +212,7 @@ bool instr() {
 //expr ::= exprLogic
 bool expr() {
 	printf("#expr %d\n", tokens[iTk].code);
-	int star;
+	int star = iTk; //salvare pozitie initiala
 	if (exprLogic()) {
 		return true;
 	}
@@ -217,11 +224,11 @@ bool expr() {
 //exprLogic :: = exprAssign((AND | OR) exprAssign) *
 bool exprLogic() {
 	printf("#exprLogic %d\n", tokens[iTk].code);
-	int star;
+	int star = iTk; //salvare pozitie initiala
 
 	if (exprAssign()) {
 		while ((consume(AND)) || (consume(OR))) {
-			if (exprAsssign()) {
+			if (exprAssign()) {
 			}
 		}
 		return true;
@@ -250,7 +257,7 @@ bool exprAssign() {
 //exprComp :: = exprAdd((LESS | EQUAL) exprAdd) ?
 bool exprComp() {
 	printf("#exprComp %d", tokens[iTk].code);
-	int star;
+	int star = iTk; //salvare pozitie initiala
 
 	if (exprAdd()) {
 		if(consume(LESS) || consume(EQUAL)){}
@@ -265,7 +272,7 @@ bool exprComp() {
 //exprAdd :: = exprMul((ADD | SUB) exprMul) *
 bool exprAdd() {
 	printf("#exprAdd %d", tokens[iTk].code);
-	int star;
+	int star = iTk; //salvare pozitie initiala
 
 	if (exprMul()) {
 		if(consume(ADD) || consume(SUB)){}
@@ -280,7 +287,7 @@ bool exprAdd() {
 //exprMul :: = exprPrefix((MUL | DIV) exprPrefix) *
 bool exprMul() {
 	printf("#exprMul %d", tokens[iTk].code);
-	int star;
+	int star = iTk; //salvare pozitie initiala
 
 	if (exprPrefix()) {
 		if(consume(MUL) || consume(DIV)){}
@@ -295,7 +302,7 @@ bool exprMul() {
 //exprPrefix :: = (SUB | NOT) ? factor
 bool exprPrefix() {
 	printf("#exprPrefix %d", tokens[iTk].code);
-	int star;
+	int star = iTk; //salvare pozitie initiala
 
 	if (consume(SUB) || consume(NOT)){
 		if (factor() || 1) {}

@@ -1,6 +1,7 @@
 ﻿// Andreea Rosu
 // Informatica
 // Anul III, 2025
+// ACTIVITATE 2
 
 #include <stdio.h>
 #include <ctype.h>
