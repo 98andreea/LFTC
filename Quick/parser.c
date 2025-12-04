@@ -131,9 +131,10 @@ bool funcParams() {
 
 	if (funcParam()) {
 			while(consume(COMMA)) {
-				if (!funcParam()) {}
-				iTk = star; //restaurare
-				return false;
+				if (!funcParam()) {
+					iTk = star; //restaurare
+					return false;
+				}
 			}
 			return true;
 		}
@@ -158,7 +159,7 @@ bool funcParam() {
 }
 
 
-// --> DE CORECTAT DE AICI IN JOS
+
 //instr :: = expr ? SEMICOLON
 //| IF LPAR expr RPAR block(ELSE block) ? END
 //| RETURN expr SEMICOLON
@@ -167,18 +168,9 @@ bool instr() {
 	printf("#instr %d\n", tokens[iTk].code);
 	int star = iTk;
 
-	//instr :: = expr ? SEMICOLON
-	if (expr()) {         //optionala                           
-		if (consume(SEMICOLON)) {
-			return true;
-		}
-		iTk = star; //restaurare
-		return false;
-	}
-
 	//| IF LPAR expr RPAR block(ELSE block) ? END
 	if (consume(IF)) {
-		if (consume(LPAR)) { //&& expr() && consume(RPAR) && block()){
+		if (consume(LPAR)) {
 			if (expr()) {
 				if (consume(RPAR)) {
 					if (block()) {
@@ -198,7 +190,7 @@ bool instr() {
 				}
 			}
 		}
-		
+
 		iTk = star; //restaurare
 		return false;
 	}
@@ -207,6 +199,7 @@ bool instr() {
 	else if (consume(RETURN)) {
 		if (expr()) {
 			if (consume(SEMICOLON)) {
+				return true;
 			}
 		}
 		iTk = star; //restaurare
@@ -229,10 +222,20 @@ bool instr() {
 		iTk = star; //restaurare
 		return false;
 	}
-	
-	iTk = star; //restaurare
+
+	//instr :: = expr ? SEMICOLON (ultimul caz, optional)
+	else if (expr()) {
+		if (consume(SEMICOLON)) {
+			return true;
+		}
+		iTk = star; //restaurare
+		return false;
+	}
+
+	iTk = star; //restaurare finala
 	return false;
-}	
+}
+
 
 //expr ::= exprLogic
 bool expr() {
@@ -297,7 +300,7 @@ bool exprAssign() {
 
 //exprComp :: = exprAdd((LESS | EQUAL) exprAdd) ?
 bool exprComp() {
-	printf("#exprComp %d", tokens[iTk].code);
+	printf("#exprComp %d\n", tokens[iTk].code);
 	int star = iTk; //salvare pozitie initiala
 
 	if (!exprAdd()) {
@@ -317,10 +320,10 @@ bool exprComp() {
 
 //exprAdd :: = exprMul((ADD | SUB) exprMul) * --> 0 sau mai multe ori
 bool exprAdd() {
-	printf("#exprAdd %d", tokens[iTk].code);
+	printf("#exprAdd %d\n", tokens[iTk].code);
 	int star = iTk; //salvare pozitie initiala
 
-	if (exprMul()) {
+	if (!exprMul()) {
 		iTk = star; //restaurare
 		return false;
 	}
@@ -341,7 +344,7 @@ bool exprAdd() {
 
 //exprMul :: = exprPrefix((MUL | DIV) exprPrefix) *
 bool exprMul() {
-	printf("#exprMul %d", tokens[iTk].code);
+	printf("#exprMul %d\n", tokens[iTk].code);
 	int star = iTk; //salvare pozitie initiala
 
 	if (!exprPrefix()) {
@@ -351,7 +354,7 @@ bool exprMul() {
 
 	while (1) {
 		if (consume(MUL) || consume(DIV)) {
-			if (!exprPrefix) {
+			if (!exprPrefix()) {
 				iTk = star; //restaurare
 				return false;
 			}
@@ -366,7 +369,7 @@ bool exprMul() {
 
 //exprPrefix :: = (SUB | NOT) ? factor
 bool exprPrefix() {
-	printf("#exprPrefix %d", tokens[iTk].code);
+	printf("#exprPrefix %d\n", tokens[iTk].code);
 	int star = iTk; //salvare pozitie initiala
 
 	if (consume(SUB) || consume(NOT)){
@@ -386,26 +389,47 @@ bool exprPrefix() {
 //| LPAR expr RPAR
 //| ID(LPAR(expr(COMMA expr)*) ? RPAR) ?
 bool factor() {
-	printf("#factor %d", tokens[iTk].code);
-	int star;
+	printf("#factor %d\n", tokens[iTk].code);
+	int star = iTk; //salvare pozitie initiala
 
-	if(consume(INT)){}
-	else if(consume(REAL)){}
-	else if(consume(STR)){}
+	if (consume(INT)) {
+		return true;
+	}
+	else if(consume(REAL)){
+		return true; 
+	}
+	else if(consume(STR)){
+		return true;
+	}
 	else if (consume(LPAR)) {
 		if (expr()) {
-			if(consume(RPAR)){}
-		}
-	}
-	else if (consume(ID) && consume(LPAR)) {
-		if (expr()) {
-			if (consume(COMMA)) {
-				if(expr()){}
+			if(consume(RPAR)){
+				return true;
 			}
 		}
-		if(consume(RPAR)){}
+		iTk = star; //restaurare
+		return false;
 	}
-	return true;
+	else if (consume(ID)) {
+		if (consume(LPAR)) {
+			if (expr()) {
+				while (consume(COMMA)) {
+					if (!expr()) {
+						iTk = star;
+						return false;
+					}
+				}
+			}
+			if (!consume(RPAR)) {
+				iTk = star;
+				return false;
+			}
+			return true;
+		}
+		return true;
+	}
+	iTk = star; //restaurare
+	return false;
 }
 
 
