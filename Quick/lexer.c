@@ -170,7 +170,7 @@ void tokenize(const char* pch) {
             start = pch;
             while (*pch != '"' && *pch != '\0')
                 pch++;
-            tk = addTk(STR); // Schimba TYPE_STR in STR
+            tk = addTk(STR); 
             copyn(tk->text, start, pch);
             pch++;
             break;
@@ -178,7 +178,7 @@ void tokenize(const char* pch) {
         default:
             if (isalpha(*pch) || *pch == '_') {
                 for (start = pch++; isalnum(*pch) || *pch == '_'; pch++) {}
-                char* text = copyn(buf, start, pch); // COPIE DOAR O DATĂ
+                char* text = copyn(buf, start, pch); 
 
                 // verificare daca este vre-un keyword
                 if (strcmp(text, "int") == 0) addTk(TYPE_INT);
@@ -205,7 +205,7 @@ void tokenize(const char* pch) {
                 }
 
                 int is_real = 0;
-                // 2. Verificam si cautam partea zecimana
+                // 2. Verificam si cautam partea zecimala
                 if (*pch == '.') {
                     is_real = 1;
                     pch++; // Sare peste '.'
@@ -214,7 +214,7 @@ void tokenize(const char* pch) {
                     }
                 }
 
-                // 3. Copiem nr inttren in buf
+                // 3. Copiem nr int in buf
                 copyn(buf, start, pch);
 
                 // 4. Se creeaza tokenul
@@ -268,7 +268,7 @@ void showTokens() {
             case GREATER: printf("GREATER\n"); break;
             case GREATERQ: printf("GREATERQ\n"); break;
             case INT: printf("INT:%d\n", tk->i); break;
-            case REAL: printf("REAL:%f\n", tk->r); break;
+            case REAL: printf("REAL:%.10g\n", tk->r); break;
             case STR: printf("STR:%s\n", tk->text); break;
         }
     }

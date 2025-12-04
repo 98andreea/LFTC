@@ -1,3 +1,6 @@
+// Andreea Rosu
+// Informatica
+// Anul III, 2025
 // ACTIVITATE 3
 #include <stdbool.h>
 #include <stdio.h>
@@ -163,48 +166,70 @@ bool funcParam() {
 bool instr() {
 	printf("#instr %d\n", tokens[iTk].code);
 	int star = iTk;
-	if(expr() || 1){         //optionala                           
-		if (consume(SEMICOLON)) {} 
-		 else if (consume(IF)) {
-			if (consume(LPAR)) {
-				if (expr()) {
-					if (consume(RPAR)) {
-						if (block()) {
-							if (((consume(ELSE)) && (block())) || 1) {} //optionala
-							if (consume(END)) {
-							}
-						}
-					}
-				}
-			}
-			iTk = star; //restaurare
-			return false;
-		}
-		 else if (consume(RETURN)) {
-			if (expr()) {
-				if (consume(SEMICOLON)) {
 
-				}
-			}
-			iTk = star; //restaurare
-			return false;
+	//instr :: = expr ? SEMICOLON
+	if (expr()) {         //optionala                           
+		if (consume(SEMICOLON)) {
+			return true;
 		}
-		 else if (consume(WHILE)) {
-			if (consume(LPAR)) {
-				if (expr()) {
-					if (consume(RPAR)) {
-						if (block()) {
-							if (consume(END)) {
-							}
-						}
-					}
-				}
-			}
-			iTk = star; //restaurare
-			return false;
-		}
+		iTk = star; //restaurare
 		return false;
 	}
+
+	//| IF LPAR expr RPAR block(ELSE block) ? END
+	if (consume(IF)) {
+		if (consume(LPAR)) { //&& expr() && consume(RPAR) && block()){
+			if (expr()) {
+				if (consume(RPAR)) {
+					if (block()) {
+
+						//optional -> (ELSE block) ?
+						if (consume(ELSE)) {
+							if (!block()) {
+								iTk = star;
+								return false;
+							}
+						}
+
+						if (consume(END)) {
+							return true;
+						}
+					}
+				}
+			}
+		}
+		
+		iTk = star; //restaurare
+		return false;
+	}
+
+	//| RETURN expr SEMICOLON
+	else if (consume(RETURN)) {
+		if (expr()) {
+			if (consume(SEMICOLON)) {
+			}
+		}
+		iTk = star; //restaurare
+		return false;
+	}
+
+	//| WHILE LPAR expr RPAR block END
+	else if (consume(WHILE)) {
+		if (consume(LPAR)) {
+			if (expr()) {
+				if (consume(RPAR)) {
+					if (block()) {
+						if (consume(END)) {
+							return true;
+						}
+					}
+				}
+			}
+		}
+		iTk = star; //restaurare
+		return false;
+	}
+	
 	iTk = star; //restaurare
 	return false;
 }	
@@ -221,36 +246,52 @@ bool expr() {
 	return false;
 }
 
-//exprLogic :: = exprAssign((AND | OR) exprAssign) *
+//exprLogic :: = exprAssign((AND | OR) exprAssign) * --> de 0 sau mai mule ori
 bool exprLogic() {
 	printf("#exprLogic %d\n", tokens[iTk].code);
 	int star = iTk; //salvare pozitie initiala
 
 	if (exprAssign()) {
-		while ((consume(AND)) || (consume(OR))) {
-			if (exprAssign()) {
+		while (1) {
+			if (consume(AND)) {
+				if (!exprAssign()) {
+					iTk = star; //restaurare
+					return false;
+				}
+			}
+			else if (consume(OR)) {
+				if (!exprAssign()) {
+					iTk = star; //restaurare
+					return false;
+				}
+			}
+			else {
+				break;
 			}
 		}
-		return true;
 	}
-	iTk = star; //restaurare
-	return false;
+	return true;
 }
 
 
 //exprAssign :: = (ID ASSIGN) ? exprComp
 bool exprAssign() {
 	printf("#exprAssign %d\n", tokens[iTk].code);
-	int star;
+	int star = iTk;
 	
-	if (consume(ID) || 1) {
-		if (exprComp()) {
+	//(ID ASSIGN) ? --> asta este optionala
+	if (consume(ID)) {
+		if (!consume(ASSIGN)) {
+			iTk = star; //restaurare
 		}
-		return true;
 	}
 
-	iTk = star; //restaurare
-	return false;
+	if (!exprComp()) {
+		iTk = star; //restaurare
+		return false;
+	}
+
+	return true;
 }
 
 
@@ -259,29 +300,43 @@ bool exprComp() {
 	printf("#exprComp %d", tokens[iTk].code);
 	int star = iTk; //salvare pozitie initiala
 
-	if (exprAdd()) {
-		if(consume(LESS) || consume(EQUAL)){}
-		if (exprAdd()) {}
-		return true;
+	if (!exprAdd()) {
+		iTk = star; //restaurare
+		return false;
 	}
 
-	iTk = star; //restaurare
-	return false;
+	if (consume(LESS) || consume(EQUAL)) {
+		if (!exprAdd()) {
+			iTk = star; //restaurare
+			return false;
+		}
+	}
+
+	return true;
 }
 
-//exprAdd :: = exprMul((ADD | SUB) exprMul) *
+//exprAdd :: = exprMul((ADD | SUB) exprMul) * --> 0 sau mai multe ori
 bool exprAdd() {
 	printf("#exprAdd %d", tokens[iTk].code);
 	int star = iTk; //salvare pozitie initiala
 
 	if (exprMul()) {
-		if(consume(ADD) || consume(SUB)){}
-		if(exprMul()){}
-		return true;
+		iTk = star; //restaurare
+		return false;
 	}
 
-	iTk = star; //restaurare
-	return false;
+	while (1) {
+		if ((consume(ADD)) || consume(SUB)) {
+			if (!exprMul()) {
+				iTk = star; //restaurare
+				return false;
+			}
+		}
+		else {
+			break;
+		}
+	}
+	return true;
 }
 
 //exprMul :: = exprPrefix((MUL | DIV) exprPrefix) *
@@ -289,14 +344,24 @@ bool exprMul() {
 	printf("#exprMul %d", tokens[iTk].code);
 	int star = iTk; //salvare pozitie initiala
 
-	if (exprPrefix()) {
-		if(consume(MUL) || consume(DIV)){}
-		if (exprPrefix){}
-		return true;
+	if (!exprPrefix()) {
+		iTk = star; //restaurare
+		return false;
 	}
 
-	iTk = star; //restaurare
-	return false;
+	while (1) {
+		if (consume(MUL) || consume(DIV)) {
+			if (!exprPrefix) {
+				iTk = star; //restaurare
+				return false;
+			}
+		}
+		else {
+			break;
+		}
+	}
+
+	return true;
 }
 
 //exprPrefix :: = (SUB | NOT) ? factor
@@ -305,12 +370,14 @@ bool exprPrefix() {
 	int star = iTk; //salvare pozitie initiala
 
 	if (consume(SUB) || consume(NOT)){
-		if (factor() || 1) {}
-		return true;
 	}
 
-	iTk = star; //restaurare
-	return false;
+	if (!factor()) {
+		iTk = star; //restaurare
+		return false;
+	}
+
+	return true;
 }
 
 //factor :: = INT
