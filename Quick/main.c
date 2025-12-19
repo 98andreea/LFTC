@@ -17,10 +17,11 @@ int main() {
 	showTokens();
 	printf("\n");
 
-	printf("~~~~ANALIZATORUL SINTACTIC~~~~\n");
+	printf("~~~~ANALIZATORUL SINTACTIC SI ANALIZA DE DOMENIU~~~~\n");
 	parse();
+	printf("Program sintactic corect\n");
+	printf("\n");
 	printf("\n");
 
-	printf("~~~~ANALIZA DE DOMENIU~~~~\n");
 	return 0;
 }
