@@ -1,7 +1,7 @@
 ﻿// Andreea Rosu
 // Informatica
 // Anul III, 2025
-// ACTIVITATE 3 --> NOTA 9
+// ACTIVITATE 3 --> NOTA 9,m
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +49,6 @@ bool consume(int code){
 		}
 	return false;
 	}
-
 
 
 //Laborator activitate 3 ---> 
@@ -276,6 +275,9 @@ bool instr() {
 			tkerr("Eroare: Lipseste blocul de instructiune dupa dupa IF");
 		}
 
+		{
+			if (ret.type == TYPE_STR)tkerr("the if condition must have type int or real");
+		}
 
 		//optional -> (ELSE block) ?
 		if (consume(ELSE)) {
@@ -295,6 +297,11 @@ bool instr() {
 		if (!expr()) {
 			tkerr("Eroare: Lipseste expresie dupa RETURN");
 		}
+		{
+			if (!crtFn)tkerr("return can be used only in a function");
+				if (ret.type != crtFn->type)tkerr("the return type must be the same as the function return type");
+		}
+
 		if (!consume(SEMICOLON)) {
 			tkerr("Eroare: Lipseste ';' dupa RETURN");
 		}
@@ -316,6 +323,11 @@ bool instr() {
 		if (!block()) {
 			tkerr("Eroare: Lipseste blocul de instructiune dupa WHILE");
 		}
+
+		{
+			if (ret.type == TYPE_STR)tkerr("the while condition must have type int or real");
+		}
+
 		if (!consume(END)) {
 			tkerr("Eroare: Lipseste 'END' dupa WHILE");
 		}
@@ -359,17 +371,25 @@ bool exprLogic() {
 		iTk = star; //restaurare finala
 		return false;
 	}
+
 		while (1) {
+			Ret leftType = ret;
 			if (consume(AND)) {
 				if (!exprAssign()) {
+					if (leftType.type == TYPE_STR) tkerr("the left operand of && cannot be of type str");
 					tkerr("ELipseste expresia dupa operatorul AND");
+					if (ret.type == TYPE_STR) tkerr("the right operand of && cannot be of type str");
+					setRet(TYPE_INT, false);
 					//iTk = star; //restaurare finala
 					//return false;
 				}
 			}
 			else if (consume(OR)) {
 				if (!exprAssign()) {
+					if (leftType.type == TYPE_STR) tkerr("the left operand of || cannot be of type str");
 					tkerr("ELipseste expresia dupa operatorul OR");
+					if (ret.type == TYPE_STR) tkerr("the right operand of && cannot be of type str");
+					setRet(TYPE_INT, false);
 					//iTk = star; //restaurare
 					//return false;
 				}
@@ -389,12 +409,19 @@ bool exprAssign() {
 	
 	//(ID ASSIGN) ? --> asta este optionala
 	if (consume(ID)) {
+		const char* name = consumed->text; // Reținem numele ID-ului
 		if (consume(ASSIGN)) {
 			if (!exprComp()) {
 				tkerr("Eroare: Lipseste expresia dupa '='");
 				iTk = star;  // restaurăm poziția
 				return false;
 			}
+			//verificare
+			Symbol* s = searchSymbol(name);
+			if (!s) tkerr("undefined symbol: %s", name);
+			if (s->kind == KIND_FN) tkerr("a function (%s) cannot be used as a destination for assignment", name);
+			if (s->type != ret.type) tkerr("the source and destination for assignment must have the same type");
+			ret.lval = false;
 			return true;
 		}
 		else {
@@ -415,17 +442,25 @@ bool exprComp() {
 	//printf("#exprComp %d\n", tokens[iTk].code);
 	int star = iTk; //salvare pozitie initiala
 
+	{
+		Ret leftType = ret;
+	}
+
 	if (!exprAdd()) {
 		iTk = star; //restaurare
 		return false;
 	}
 
 	if (consume(LESS) || consume(EQUAL)) {
+		Ret leftType = ret;
 		if (!exprAdd()) {
 			tkerr("Lipseste operandul dupa operatorul de comparatie");
 			iTk = star; //restaurare
 			return false;
 		}
+
+		if (leftType.type != ret.type) tkerr("different types for the operands of < or ==");
+		setRet(TYPE_INT, false);
 	}
 
 	return true;
@@ -443,11 +478,17 @@ bool exprAdd() {
 
 	while (1) {
 		if ((consume(ADD)) || consume(SUB)) {
+			Ret leftType = ret;
+			if (leftType.type == TYPE_STR) tkerr("the operands of + or - cannot be of type str");
+
 			if (!exprMul()) {
 				tkerr("Lipseste operandul dupa operatorul '+' sau '-'");
 				iTk = star; //restaurare
 				return false;
 			}
+
+			if (leftType.type != ret.type) tkerr("different types for the operands of + or -");
+			setRet(leftType.type, false);
 		}
 		else {
 			break;
@@ -468,11 +509,17 @@ bool exprMul() {
 
 	while (1) {
 		if (consume(MUL) || consume(DIV)) {
+			Ret leftType = ret;
+			if (leftType.type == TYPE_STR) tkerr("the operands of * or / cannot be of type str");
 			if (!exprPrefix()) {
 				tkerr("Lipseste operandul dupa operatorul '*' sau '/'");
 				iTk = star; //restaurare
 				return false;
 			}
+
+			if (leftType.type != ret.type) tkerr("different types for the operands of * or /");
+			setRet(leftType.type, false);
+
 		}
 		else {
 			break;
@@ -487,12 +534,24 @@ bool exprPrefix() {
 	//printf("#exprPrefix %d\n", tokens[iTk].code);
 	int star = iTk; //salvare pozitie initiala
 
-	if (consume(SUB) || consume(NOT)){
+	if (consume(SUB)) {
 		if (!factor()) {
-			tkerr("Eroare: Factor invalid dupa SUB sau NOT");
-			iTk = star; //restaurare
-			return false;
+			tkerr("Eroare: Factor invalid dupa SUB");
 		}
+		// Regula 10: SUB definit doar pentru int si real
+		if (ret.type == TYPE_STR) tkerr("the expression of unary - must be of type int or real");
+		setRet(TYPE_INT, false);
+		return true;
+	}
+
+	if (consume(NOT)) {
+		if (!factor()) {
+			tkerr("Eroare: Factor invalid dupa NOT");
+		}
+		// Regula 10: NOT definit doar pentru int si real
+		if (ret.type == TYPE_STR) tkerr("the expression of ! must be of type int or real");
+		// Regula 12: ! returneaza int (0 sau 1)
+		setRet(TYPE_INT, false);
 		return true;
 	}
 
@@ -512,10 +571,18 @@ bool factor() {
 	//printf("#factor %d\n", tokens[iTk].code);
 	int star = iTk; //salvare pozitie initiala
 
-	if (consume(INT) || consume(REAL) || consume(STR)) {
+	if (consume(INT)) {
+		setRet(TYPE_INT, false);
 		return true;
 	}
-
+	if (consume(REAL)) {
+		setRet(TYPE_REAL, false);
+		return true;
+	}
+	if (consume(STR)) {
+		setRet(TYPE_STR, false);
+		return true;
+	}
 	
 	if (consume(LPAR)) {
 		if (!expr()) {
@@ -528,18 +595,43 @@ bool factor() {
 	}
 	
 	if (consume(ID)) {
+
+		Symbol* s = searchSymbol(consumed->text);
+		if (!s) tkerr("undefined symbol: %s", consumed->text);
+
 		if (consume(LPAR)) {
+
+			if (s->kind != KIND_FN) tkerr("%s is not a function", s->name);
+			Symbol* argDef = s->args;
+
 			if (expr()) {
+
+				if (!argDef) tkerr("too many arguments for %s", s->name);
+				if (argDef->type != ret.type) tkerr("argument type mismatch");
+				argDef = argDef->next;
+
 				while (consume(COMMA)) {
 					if (!expr()) {
 						tkerr("Lipseste expresie dupa ',' in apelul de functie");
 					}
+
+					if (!argDef) tkerr("too many arguments");
+					if (argDef->type != ret.type) tkerr("argument type mismatch");
+					argDef = argDef->next;
 				}
 			}
+
+			if (argDef) tkerr("too few arguments for %s", s->name);
 
 			if (!consume(RPAR)) {
 				tkerr("Lipseste ')' la sfarsitul apelului de functie");
 			}
+			setRet(s->type, false);
+		}
+		else {
+			// Regula 2: Funcțiile se pot doar apela (nu pot fi folosite ca variabile)
+			if (s->kind == KIND_FN) tkerr("the function %s can only be called", s->name);
+			setRet(s->type, true);
 		}
 		return true;
 	}
@@ -555,6 +647,9 @@ bool program(){
 	////analiza de domeniu
 	addDomain(); // creates the global domain
 	
+	{
+		addPredefinedFns(); 
+	}
 
 	for(;;){
 		
