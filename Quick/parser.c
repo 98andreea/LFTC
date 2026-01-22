@@ -1,16 +1,17 @@
 ﻿// Andreea Rosu
 // Informatica
 // Anul III, 2025
-// ACTIVITATE 3 --> NOTA 9,m
+// ACTIVITATE 3 --> NOTA 9
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdint.h>
 
 #include "lexer.h"
 #include "ad.h"
 
-Ret ret; 
+Ret ret;
 Symbol* crtFn = NULL;
 
 bool block();
@@ -26,650 +27,443 @@ bool funcParam();
 bool funcParams();
 bool instr();
 
-
-
-int iTk;	// the iterator in tokens
-Token *consumed;	// the last consumed token
+int iTk;    // the iterator in tokens
+Token* consumed;    // the last consumed token
 
 // same as err, but also prints the line of the current token
-void tkerr(const char *fmt,...){
-	fprintf(stderr,"error in line %d: ",tokens[iTk].line);
-	va_list va;
-	va_start(va,fmt);
-	vfprintf(stderr,fmt,va);
-	va_end(va);
-	fprintf(stderr,"\n");
-	exit(EXIT_FAILURE);
-	}
+void tkerr(const char* fmt, ...) {
+    fprintf(stderr, "error in line %d: ", tokens[iTk].line);
+    va_list va;
+    va_start(va, fmt);
+    vfprintf(stderr, fmt, va);
+    va_end(va);
+    fprintf(stderr, "\n");
+    exit(EXIT_FAILURE);
+}
 
-bool consume(int code){
-	if(tokens[iTk].code==code){
-		consumed=&tokens[iTk++];
-		return true;
-		}
-	return false;
-	}
+bool consume(int code) {
+    if (tokens[iTk].code == code) {
+        consumed = &tokens[iTk++];
+        return true;
+    }
+    return false;
+}
 
+////+
+//void setRet(int type, bool lval) {
+//    ret.type = type;
+//    ret.lval = lval;
+//}
 
-//Laborator activitate 3 ---> 
-//baseType :: = TYPE_INT | TYPE_REAL | TYPE_STR --> chestiile de baza, tipurile
+// baseType ::= TYPE_INT | TYPE_REAL | TYPE_STR
 bool baseType() {
-	//printf("#baseType %d\n", tokens[iTk].code);
-	if (consume(TYPE_INT)){
-		ret.type = TYPE_INT;
-		return true;
-	}
-	
-	if (consume(TYPE_REAL)) {
-		ret.type = TYPE_REAL;
-		return true;
-	}
-	
-	if(consume(TYPE_STR)) {
-		ret.type = TYPE_STR;
-		return true;
-	}
-
-	return false;
+    if (consume(TYPE_INT)) {
+        ret.type = TYPE_INT;
+        return true;
+    }
+    if (consume(TYPE_REAL)) {
+        ret.type = TYPE_REAL;
+        return true;
+    }
+    if (consume(TYPE_STR)) {
+        ret.type = TYPE_STR;
+        return true;
+    }
+    return false;
 }
 
-//defVar ::= VAR ID COLON baseType SEMICOLON
+// defVar ::= VAR ID COLON baseType SEMICOLON
 bool defVar() {
-	//printf("#defVar %d\n", tokens[iTk].code);
-	//totul sau nimic
-	// -daca se indeplinese regula, isi consuma toti atomii si returneaza true
-	// -altfel, daca nu se indeplinese regla, reurneaza false
-	int star = iTk; //salvare pozitie initiala
-	Symbol* s = NULL;
+    int star = iTk;
+    Symbol* s = NULL;
 
-	if (!consume(VAR)) {
-		iTk = star; //restaurare
-		return false;
-	}
-	else {
-		if (!consume(ID)) {
-			tkerr("Eroare: Lipseste identificator dupa variabila var");
-		}
-	
-		////analiza de domeniu
-		{
-			const char* name = consumed->text;
-			Symbol* s = searchInCurrentDomain(name);
-			if (s)tkerr("symbol redefinition: %s", name);
-			s = addSymbol(name, KIND_VAR);
-			s->local = crtFn != NULL;
-		}
-	
-		if (!consume(COLON)) {
-			tkerr("Eroare: Lipseste ':' dupa numele variabilei");
-		}
-		if (!baseType()) {
-			tkerr("Eroare: Tip invalid pentru variabila");
-		}
+    if (!consume(VAR)) {
+        iTk = star;
+        return false;
+    }
+    else {
+        if (!consume(ID)) {
+            tkerr("Eroare: Lipseste identificator dupa variabila var");
+        }
 
-		////analiza de domeniu
-		if (s) {
-			s->type = ret.type;
-		}
+        {
+            const char* name = consumed->text;
+            s = searchInCurrentDomain(name);
+            if (s) tkerr("symbol redefinition: %s", name);
+            s = addSymbol(name, KIND_VAR);
+            s->local = (crtFn != NULL);
+        }
 
-		if (!consume(SEMICOLON)) {
-			tkerr("Eroare: Lipseste ';' dupa numele variabilei");
-		}
-	}
-	return true;
+        if (!consume(COLON)) {
+            tkerr("Eroare: Lipseste ':' dupa numele variabilei");
+        }
+        if (!baseType()) {
+            tkerr("Eroare: Tip invalid pentru variabila");
+        }
+
+        if (s) {
+            s->type = ret.type;
+        }
+
+        if (!consume(SEMICOLON)) {
+            tkerr("Eroare: Lipseste ';' dupa numele variabilei");
+        }
+    }
+    return true;
 }
 
-//defFunc :: = FUNCTION ID LPAR funcParams? RPAR COLON baseType defVar * block END
+// defFunc ::= FUNCTION ID LPAR funcParams? RPAR COLON baseType defVar* block END
 bool defFunc() {
-	//printf("#defFunc %d\n", tokens[iTk].code);
-	int star = iTk;
-	if (!consume(FUNCTION)) {
-		iTk = star; //restaurare
-		return false;
-	}
-	else {
-		if (!consume(ID)) {
-			tkerr("Eroare: Lipseste denumirea functiei numele 'function'");
-		}
+    int star = iTk;
+    if (!consume(FUNCTION)) {
+        iTk = star;
+        return false;
+    }
+    else {
+        if (!consume(ID)) {
+            tkerr("Eroare: Lipseste denumirea functiei");
+        }
 
-		////analiza de domeniu
-		const char* name = consumed->text;
-		Symbol* s = searchInCurrentDomain(name);
-		if (s)tkerr("Simbol redefinit: %s", name);
-		crtFn = addSymbol(name, KIND_FN);
-		crtFn->args = NULL;
-		addDomain();
+        const char* name = consumed->text;
+        Symbol* s = searchInCurrentDomain(name);
+        if (s) tkerr("Simbol redefinit: %s", name);
+        crtFn = addSymbol(name, KIND_FN);
+        crtFn->args = NULL;
+        addDomain();
 
-		if (!consume(LPAR)) {
-			tkerr("Eroare: Lipseste '(' dupa numele functiei");
-		}
-		funcParams(); //optional ?
-		if (!consume(RPAR)) {
-			tkerr("Eroare: Lipseste ')' dupa parametrii functiei");
-		}
-		if (!consume(COLON)) {
-			tkerr("Eroare: Lipseste ':' dupa parametrii functiei");
-		}
-		if (!baseType()) {
-			tkerr("Eroare: Tipul functiei invalid, rebuie sa fie int, real sau str");
-		}
+        if (!consume(LPAR)) {
+            tkerr("Eroare: Lipseste '(' dupa numele functiei");
+        }
+        funcParams();
+        if (!consume(RPAR)) {
+            tkerr("Eroare: Lipseste ')' dupa parametrii functiei");
+        }
+        if (!consume(COLON)) {
+            tkerr("Eroare: Lipseste ':' dupa parametrii functiei");
+        }
+        if (!baseType()) {
+            tkerr("Eroare: Tipul functiei invalid");
+        }
 
-		////analiza de domeniu
-		crtFn->type = ret.type;
+        crtFn->type = ret.type;
 
-		while (defVar()) {} //repetam de 0 sau mai multe ori
-		if (!block()) {
-			tkerr("Eroare: Blocul functiei lipseste");
-		}
-		if (!consume(END)) {
-			tkerr("Eroare: Lipseste 'END' la finalul functiei");
-		}
-	}
+        while (defVar()) {}
+        if (!block()) {
+            tkerr("Eroare: Blocul functiei lipseste");
+        }
+        if (!consume(END)) {
+            tkerr("Eroare: Lipseste 'END' la finalul functiei");
+        }
+    }
 
-	////analiza de domeniu
-	delDomain();
-	crtFn = NULL;
-
-	return true;
+    delDomain();
+    crtFn = NULL;
+    return true;
 }
 
-//block :: = instr +
 bool block() {
-	//printf("#block %d\n", tokens[iTk].code);
-	int star = iTk;
+    int star = iTk;
+    if (!instr()) {
+        iTk = star;
+        return false;
+    }
+    while (instr()) {}
+    return true;
+}
 
-	if (!instr()) { 
-		iTk = star; //restaurare
-		return false;
-	}
-
-	while(instr()){}
-
-	return true;	
-}	
-
-
-//funcParams :: = funcParam(COMMA funcParam)* * --> SE REPETA DE LA 0 LA oo
 bool funcParams() {
-	//printf("#funcParams %d\n", tokens[iTk].code);
-	int star = iTk;
-
-	if (!funcParam()) {
-		tkerr("Eroare: Trebuie sa existe cel putin 1 parametru in functie\n");
-		iTk = star;
-		return false;
-	}
-
-	while (consume(COMMA)) {
-		if (!funcParam()) {
-			tkerr("Eroare: Lipseste parametru dupa ','");
-			iTk = star; //restaurare
-			return false;
-		}
-	}
-
-	return true;
+    int star = iTk;
+    if (!funcParam()) {
+        iTk = star;
+        return false;
+    }
+    while (consume(COMMA)) {
+        if (!funcParam()) {
+            tkerr("Eroare: Lipseste parametru dupa ','");
+        }
+    }
+    return true;
 }
 
-//funcParam :: = ID COLON baseType
 bool funcParam() {
-	//printf("#funcParam %d\n", tokens[iTk].code);
-	int star = iTk;
-	if (!consume(ID)) {
-		tkerr("Eroare: Lipseste identificatorul parametrului");
-		iTk = star; //restaurare
-		return false;
-	}
+    int star = iTk;
+    if (!consume(ID)) {
+        iTk = star;
+        return false;
+    }
 
-	////analiza de domeniu
-	const char* name = consumed->text;
-	Symbol* s = searchInCurrentDomain(name);
-	if (s)tkerr("Simbol redefinit: %s", name);
-	s = addSymbol(name, KIND_ARG);
-	Symbol* sFnParam = addFnArg(crtFn, name);
+    const char* name = consumed->text;
+    Symbol* s = searchInCurrentDomain(name);
+    if (s) tkerr("Simbol redefinit: %s", name);
+    s = addSymbol(name, KIND_ARG);
+    Symbol* sFnParam = addFnArg(crtFn, name);
 
-	if (!consume(COLON)) {
-		tkerr("Eroare: Lipseste ':' dupa numele parametrului");
-		iTk = star; //restaurare
-		return false;
-	}
-	
+    if (!consume(COLON)) {
+        tkerr("Eroare: Lipseste ':' dupa numele parametrului");
+    }
 
-	if (!baseType()) {
-		tkerr("Eroare: Tip invalid pentru parametrul functiei");
-		iTk = star; //restaurare
-		return false;
-	}
-	////analiza de domeniu
-	s->type = ret.type;
-	sFnParam->type = ret.type;
+    if (!baseType()) {
+        tkerr("Eroare: Tip invalid pentru parametrul functiei");
+    }
+    s->type = ret.type;
+    sFnParam->type = ret.type;
 
-	return true;
+    return true;
 }
 
-
-
-//instr :: = expr ? SEMICOLON
-//| IF LPAR expr RPAR block(ELSE block) ? END
-//| RETURN expr SEMICOLON
-//| WHILE LPAR expr RPAR block END
 bool instr() {
-	//printf("#instr %d\n", tokens[iTk].code);
-	int star = iTk;
+    int star = iTk;
 
-	//| IF LPAR expr RPAR block(ELSE block) ? END
-	if (consume(IF)) {
-		if (!consume(LPAR)) {
-			tkerr("Eroare: Lipseste '(' dupa IF");
-		}
+    if (consume(IF)) {
+        if (!consume(LPAR)) tkerr("Eroare: Lipseste '(' dupa IF");
+        if (!expr()) tkerr("Eroare: Lipseste expresia dupa IF");
 
-		if (!expr()) {
-			tkerr("Eroare: Lipseste expresia dupa IF");
-		}
+        //+
+        if (ret.type == TYPE_STR) tkerr("the if condition must have type int or real");
 
-		if (!consume(RPAR)) {
-			tkerr("Eroare: Lipseste ')' dupa IF");
-		}
+        if (!consume(RPAR)) tkerr("Eroare: Lipseste ')' dupa IF");
+        if (!block()) tkerr("Eroare: Lipseste blocul dupa IF");
+        if (consume(ELSE)) {
+            if (!block()) tkerr("Eroare: Lipseste blocul dupa ELSE");
+        }
+        if (!consume(END)) tkerr("Eroare: Lipseste END dupa IF");
+        return true;
+    }
 
-		if (!block()) {
-			tkerr("Eroare: Lipseste blocul de instructiune dupa dupa IF");
-		}
+    if (consume(RETURN)) {
+        if (!expr()) tkerr("Eroare: Lipseste expresie dupa RETURN");
 
-		{
-			if (ret.type == TYPE_STR)tkerr("the if condition must have type int or real");
-		}
+        //+
+        if (!crtFn) tkerr("return can be used only in a function");
+        if (ret.type != crtFn->type) tkerr("the return type must be the same as function return type");
 
-		//optional -> (ELSE block) ?
-		if (consume(ELSE)) {
-			if (!block()) {
-				tkerr("Eroare: Lipseste blocul de instructiune dupa IF");
-			}
-		}
+        if (!consume(SEMICOLON)) tkerr("Eroare: Lipseste ';' dupa RETURN");
+        return true;
+    }
 
-		if (!consume(END)) {
-			tkerr("Eroare: Lipseste END dupa IF");
-		}
-		return true;
-	}
+    if (consume(WHILE)) {
+        if (!consume(LPAR)) tkerr("Eroare: Lipseste '(' dupa WHILE");
+        if (!expr()) tkerr("Eroare: Lipseste expresia dupa WHILE");
 
-	//| RETURN expr SEMICOLON
-	if (consume(RETURN)) {
-		if (!expr()) {
-			tkerr("Eroare: Lipseste expresie dupa RETURN");
-		}
-		{
-			if (!crtFn)tkerr("return can be used only in a function");
-				if (ret.type != crtFn->type)tkerr("the return type must be the same as the function return type");
-		}
+        //+
+        if (ret.type == TYPE_STR) tkerr("the while condition must have type int or real");
 
-		if (!consume(SEMICOLON)) {
-			tkerr("Eroare: Lipseste ';' dupa RETURN");
-		}
-		return true;
-	}
+        if (!consume(RPAR)) tkerr("Eroare: Lipseste ')' dupa WHILE");
+        if (!block()) tkerr("Eroare: Lipseste blocul dupa WHILE");
+        if (!consume(END)) tkerr("Eroare: Lipseste 'END' dupa WHILE");
+        return true;
+    }
 
+    if (expr()) {
+        if (!consume(SEMICOLON)) tkerr("Eroare: Lipseste ';' dupa expresie");
+        return true;
+    }
 
-	//| WHILE LPAR expr RPAR block END
-	else if (consume(WHILE)) {
-		if (!consume(LPAR)) {
-			tkerr("Eroare: Lipseste '(' dupa WHILE");
-		}
-		if (!expr()) {
-			tkerr("Eroare: Lipseste expresia dupa WHILE");
-		}
-		if (!consume(RPAR)) {
-			tkerr("Eroare: Lipseste ')' dupa WHILE");
-		}
-		if (!block()) {
-			tkerr("Eroare: Lipseste blocul de instructiune dupa WHILE");
-		}
-
-		{
-			if (ret.type == TYPE_STR)tkerr("the while condition must have type int or real");
-		}
-
-		if (!consume(END)) {
-			tkerr("Eroare: Lipseste 'END' dupa WHILE");
-		}
-		return true;
-	}
-
-
-	//instr :: = expr ? SEMICOLON (ultimul caz, optional)
-	if (expr()) {
-		if (!consume(SEMICOLON)) {
-			tkerr("Eroare: Lipseste ';' dupa expresie");
-		}
-		
-		return true;
-	}
-
-	iTk = star; //restaurare finala
-	return false;
+    iTk = star;
+    return false;
 }
 
-
-//expr ::= exprLogic
 bool expr() {
-	//printf("#expr %d\n", tokens[iTk].code);
-	int star = iTk; //salvare pozitie initiala
-
-	if (!exprLogic()) {
-		iTk = star; //restaurare finala
-		return false;
-	}
-	
-	return true;
+    return exprLogic();
 }
 
-//exprLogic :: = exprAssign((AND | OR) exprAssign) * --> de 0 sau mai mule ori
 bool exprLogic() {
-	//printf("#exprLogic %d\n", tokens[iTk].code);
-	int star = iTk; //salvare pozitie initiala
+    if (!exprAssign()) return false;
+    while (1) {
 
-	if (!exprAssign()) {
-		iTk = star; //restaurare finala
-		return false;
-	}
+        //+
+        Ret leftType = ret;
 
-		while (1) {
-			Ret leftType = ret;
-			if (consume(AND)) {
-				if (!exprAssign()) {
-					if (leftType.type == TYPE_STR) tkerr("the left operand of && cannot be of type str");
-					tkerr("ELipseste expresia dupa operatorul AND");
-					if (ret.type == TYPE_STR) tkerr("the right operand of && cannot be of type str");
-					setRet(TYPE_INT, false);
-					//iTk = star; //restaurare finala
-					//return false;
-				}
-			}
-			else if (consume(OR)) {
-				if (!exprAssign()) {
-					if (leftType.type == TYPE_STR) tkerr("the left operand of || cannot be of type str");
-					tkerr("ELipseste expresia dupa operatorul OR");
-					if (ret.type == TYPE_STR) tkerr("the right operand of && cannot be of type str");
-					setRet(TYPE_INT, false);
-					//iTk = star; //restaurare
-					//return false;
-				}
-			}
-			else {
-				break;
-			}
-		}
-	return true;
+        if (consume(AND) || consume(OR)) {
+            //+
+            if (leftType.type == TYPE_STR) tkerr("the left operand of && or || cannot be str");
+
+            if (!exprAssign()) tkerr("Lipseste expresia dupa operatorul logic");
+
+            //+
+            if (ret.type == TYPE_STR) tkerr("the right operand of && or || cannot be str");
+            setRet(TYPE_INT, false);
+        }
+        else break;
+    }
+    return true;
 }
 
-
-//exprAssign :: = (ID ASSIGN) ? exprComp
 bool exprAssign() {
-	//printf("#exprAssign %d\n", tokens[iTk].code);
-	int star = iTk;
-	
-	//(ID ASSIGN) ? --> asta este optionala
-	if (consume(ID)) {
-		const char* name = consumed->text; // Reținem numele ID-ului
-		if (consume(ASSIGN)) {
-			if (!exprComp()) {
-				tkerr("Eroare: Lipseste expresia dupa '='");
-				iTk = star;  // restaurăm poziția
-				return false;
-			}
-			//verificare
-			Symbol* s = searchSymbol(name);
-			if (!s) tkerr("undefined symbol: %s", name);
-			if (s->kind == KIND_FN) tkerr("a function (%s) cannot be used as a destination for assignment", name);
-			if (s->type != ret.type) tkerr("the source and destination for assignment must have the same type");
-			ret.lval = false;
-			return true;
-		}
-		else {
-			iTk = star; //restaurare		
-		}
-	}
+    int star = iTk;
+    if (consume(ID)) {
+        const char* name = consumed->text;
+        if (consume(ASSIGN)) {
+            if (!exprComp()) {
+                tkerr("Eroare: Lipseste expresia dupa '='");
+            }
 
-	if (!exprComp()) {
-		return false;
-	}
+            //+
+            Symbol* s = searchSymbol(name);
+            if (!s) tkerr("undefined symbol: %s", name);
+            if (s->kind == KIND_FN) tkerr("a function cannot be used as destination for assignment");
+            if (s->type != ret.type) tkerr("source and destination for assignment must have same type");
 
-	return true;
+            setRet(ret.type, false);
+            return true;
+        }
+        else iTk = star;
+    }
+    return exprComp();
 }
 
-
-//exprComp :: = exprAdd((LESS | EQUAL) exprAdd) ?
 bool exprComp() {
-	//printf("#exprComp %d\n", tokens[iTk].code);
-	int star = iTk; //salvare pozitie initiala
+    if (!exprAdd()) return false;
+    if (consume(LESS) || consume(EQUAL)) {
+        //+
+        Ret leftType = ret;
 
-	{
-		Ret leftType = ret;
-	}
+        if (!exprAdd()) tkerr("Lipseste operandul dupa operatorul de comparatie");
 
-	if (!exprAdd()) {
-		iTk = star; //restaurare
-		return false;
-	}
-
-	if (consume(LESS) || consume(EQUAL)) {
-		Ret leftType = ret;
-		if (!exprAdd()) {
-			tkerr("Lipseste operandul dupa operatorul de comparatie");
-			iTk = star; //restaurare
-			return false;
-		}
-
-		if (leftType.type != ret.type) tkerr("different types for the operands of < or ==");
-		setRet(TYPE_INT, false);
-	}
-
-	return true;
+        //+
+        if (leftType.type != ret.type) tkerr("different types for comparison");
+        setRet(TYPE_INT, false);
+    }
+    return true;
 }
 
-//exprAdd :: = exprMul((ADD | SUB) exprMul) * --> 0 sau mai multe ori
 bool exprAdd() {
-	//printf("#exprAdd %d\n", tokens[iTk].code);
-	int star = iTk; //salvare pozitie initiala
+    if (!exprMul()) return false;
+    while (1) {
+        if (consume(ADD) || consume(SUB)) {
+            //+
+            Ret leftType = ret;
+            if (leftType.type == TYPE_STR) tkerr("operands of + or - cannot be str");
 
-	if (!exprMul()) {
-		iTk = star; //restaurare
-		return false;
-	}
+            if (!exprMul()) tkerr("Lipseste operandul dupa '+' sau '-'");
 
-	while (1) {
-		if ((consume(ADD)) || consume(SUB)) {
-			Ret leftType = ret;
-			if (leftType.type == TYPE_STR) tkerr("the operands of + or - cannot be of type str");
-
-			if (!exprMul()) {
-				tkerr("Lipseste operandul dupa operatorul '+' sau '-'");
-				iTk = star; //restaurare
-				return false;
-			}
-
-			if (leftType.type != ret.type) tkerr("different types for the operands of + or -");
-			setRet(leftType.type, false);
-		}
-		else {
-			break;
-		}
-	}
-	return true;
+            //+
+            if (leftType.type != ret.type) tkerr("different types for + or -");
+            setRet(leftType.type, false);
+        }
+        else break;
+    }
+    return true;
 }
 
-//exprMul :: = exprPrefix((MUL | DIV) exprPrefix) *
 bool exprMul() {
-	//printf("#exprMul %d\n", tokens[iTk].code);
-	int star = iTk; //salvare pozitie initiala
+    if (!exprPrefix()) return false;
+    while (1) {
+        if (consume(MUL) || consume(DIV)) {
+            //+
+            Ret leftType = ret;
+            if (leftType.type == TYPE_STR) tkerr("operands of * or / cannot be str");
 
-	if (!exprPrefix()) {
-		iTk = star; //restaurare
-		return false;
-	}
+            if (!exprPrefix()) tkerr("Lipseste operandul dupa '*' sau '/'");
 
-	while (1) {
-		if (consume(MUL) || consume(DIV)) {
-			Ret leftType = ret;
-			if (leftType.type == TYPE_STR) tkerr("the operands of * or / cannot be of type str");
-			if (!exprPrefix()) {
-				tkerr("Lipseste operandul dupa operatorul '*' sau '/'");
-				iTk = star; //restaurare
-				return false;
-			}
-
-			if (leftType.type != ret.type) tkerr("different types for the operands of * or /");
-			setRet(leftType.type, false);
-
-		}
-		else {
-			break;
-		}
-	}
-
-	return true;
+            //+
+            if (leftType.type != ret.type) tkerr("different types for * or /");
+            setRet(leftType.type, false);
+        }
+        else break;
+    }
+    return true;
 }
 
-//exprPrefix :: = (SUB | NOT) ? factor
 bool exprPrefix() {
-	//printf("#exprPrefix %d\n", tokens[iTk].code);
-	int star = iTk; //salvare pozitie initiala
+    if (consume(SUB)) {
+        if (!factor()) tkerr("Factor invalid");
 
-	if (consume(SUB)) {
-		if (!factor()) {
-			tkerr("Eroare: Factor invalid dupa SUB");
-		}
-		// Regula 10: SUB definit doar pentru int si real
-		if (ret.type == TYPE_STR) tkerr("the expression of unary - must be of type int or real");
-		setRet(TYPE_INT, false);
-		return true;
-	}
+        //+
+        if (ret.type == TYPE_STR) tkerr("unary - must be int or real");
+        setRet(ret.type, false);
 
-	if (consume(NOT)) {
-		if (!factor()) {
-			tkerr("Eroare: Factor invalid dupa NOT");
-		}
-		// Regula 10: NOT definit doar pentru int si real
-		if (ret.type == TYPE_STR) tkerr("the expression of ! must be of type int or real");
-		// Regula 12: ! returneaza int (0 sau 1)
-		setRet(TYPE_INT, false);
-		return true;
-	}
+        return true;
+    }
+    if (consume(NOT)) {
+        if (!factor()) tkerr("Factor invalid");
 
-	if (!factor()) {
-		return false;
-	}
+        //+
+        if (ret.type == TYPE_STR) tkerr("! must be int or real");
+        setRet(TYPE_INT, false);
 
-	return true;
+        return true;
+    }
+    return factor();
 }
 
-//factor :: = INT
-//| REAL
-//| STR
-//| LPAR expr RPAR
-//| ID(LPAR(expr(COMMA expr)*) ? RPAR) ?
 bool factor() {
-	//printf("#factor %d\n", tokens[iTk].code);
-	int star = iTk; //salvare pozitie initiala
+    int star = iTk;
+    //+
+    if (consume(INT)) { setRet(TYPE_INT, false); return true; }
+    if (consume(REAL)) { setRet(TYPE_REAL, false); return true; }
+    if (consume(STR)) { setRet(TYPE_STR, false); return true; }
 
-	if (consume(INT)) {
-		setRet(TYPE_INT, false);
-		return true;
-	}
-	if (consume(REAL)) {
-		setRet(TYPE_REAL, false);
-		return true;
-	}
-	if (consume(STR)) {
-		setRet(TYPE_STR, false);
-		return true;
-	}
-	
-	if (consume(LPAR)) {
-		if (!expr()) {
-			tkerr("Expresie lipsa dupa '('");
-		}
-		if (!consume(RPAR)) {
-			tkerr("Expresie lipsa dupa ')'");
-		}
-		return true;
-	}
-	
-	if (consume(ID)) {
+    if (consume(LPAR)) {
+        if (!expr()) tkerr("Expresie lipsa dupa '('");
+        if (!consume(RPAR)) tkerr("Lipseste ')'");
+        return true;
+    }
 
-		Symbol* s = searchSymbol(consumed->text);
-		if (!s) tkerr("undefined symbol: %s", consumed->text);
+    if (consume(ID)) {
+        //+
+        Symbol* s = searchSymbol(consumed->text);
+        if (!s) tkerr("undefined symbol: %s", consumed->text);
 
-		if (consume(LPAR)) {
+        if (consume(LPAR)) {
+            //+
+            if (s->kind != KIND_FN) tkerr("%s is not a function", s->name);
+            Symbol* argDef = s->args;
 
-			if (s->kind != KIND_FN) tkerr("%s is not a function", s->name);
-			Symbol* argDef = s->args;
+            if (expr()) {
+                //+
+                if (!argDef) tkerr("too many arguments for %s", s->name);
+                if (argDef->type != ret.type) tkerr("argument type mismatch");
+                argDef = argDef->next;
 
-			if (expr()) {
+                while (consume(COMMA)) {
+                    if (!expr()) tkerr("Lipseste expresie dupa ','");
 
-				if (!argDef) tkerr("too many arguments for %s", s->name);
-				if (argDef->type != ret.type) tkerr("argument type mismatch");
-				argDef = argDef->next;
+                    //+
+                    if (!argDef) tkerr("too many arguments");
+                    if (argDef->type != ret.type) tkerr("argument type mismatch");
+                    argDef = argDef->next;
+                }
+            }
 
-				while (consume(COMMA)) {
-					if (!expr()) {
-						tkerr("Lipseste expresie dupa ',' in apelul de functie");
-					}
+            //+
+            if (argDef) tkerr("too few arguments for %s", s->name);
 
-					if (!argDef) tkerr("too many arguments");
-					if (argDef->type != ret.type) tkerr("argument type mismatch");
-					argDef = argDef->next;
-				}
-			}
+            if (!consume(RPAR)) tkerr("Lipseste ')' la apelul functiei");
 
-			if (argDef) tkerr("too few arguments for %s", s->name);
+            //+
+            setRet(s->type, false);
+        }
+        //+
+        else {
+            if (s->kind == KIND_FN) tkerr("function %s can only be called", s->name);
+            setRet(s->type, true);
+        }
+        return true;
+    }
 
-			if (!consume(RPAR)) {
-				tkerr("Lipseste ')' la sfarsitul apelului de functie");
-			}
-			setRet(s->type, false);
-		}
-		else {
-			// Regula 2: Funcțiile se pot doar apela (nu pot fi folosite ca variabile)
-			if (s->kind == KIND_FN) tkerr("the function %s can only be called", s->name);
-			setRet(s->type, true);
-		}
-		return true;
-	}
-
-	iTk = star; //restaurare
-	return false;
+    iTk = star;
+    return false;
 }
 
+bool program() {
+    addDomain();
 
+    //+
+    addPredefinedFns();
 
-// program ::= ( defVar | defFunc | block )* FINISH
-bool program(){
-	////analiza de domeniu
-	addDomain(); // creates the global domain
-	
-	{
-		addPredefinedFns(); 
-	}
+    while (1) {
+        if (defVar()) {}
+        else if (defFunc()) {}
+        else if (block()) {}
+        else break;
+    }
+    if (!consume(FINISH)) tkerr("syntax error");
+    delDomain();
+    return true;
+}
 
-	for(;;){
-		
-		if(defVar()){}
-		else if(defFunc()){}
-		else if(block()){}
-		else break;
-		}
-	if(consume(FINISH)){
-	
-		}else tkerr("syntax error");
-
-	////analiza de domeniu
-	delDomain();
-
-	return true;
-
-	}
-
-void parse(){
-	iTk=0;
-	program();
-	}
+void parse() {
+    iTk = 0;
+    program();
+}
