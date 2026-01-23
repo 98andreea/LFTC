@@ -127,8 +127,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="1.c" />
     <ClCompile Include="ad.c" />
     <ClCompile Include="at.c" />
+    <ClCompile Include="gen.c" />
     <ClCompile Include="lexer.c">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4996</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4996</DisableSpecificWarnings>
@@ -142,8 +144,10 @@
   <ItemGroup>
     <ClInclude Include="ad.h" />
     <ClInclude Include="at.h" />
+    <ClInclude Include="gen.h" />
     <ClInclude Include="lexer.h" />
     <ClInclude Include="parser.h" />
+    <ClInclude Include="quick.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>

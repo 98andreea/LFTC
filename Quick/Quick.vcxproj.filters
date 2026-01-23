@@ -33,6 +33,12 @@
     <ClCompile Include="at.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gen.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lexer.h">
@@ -48,6 +54,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="at.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="quick.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
